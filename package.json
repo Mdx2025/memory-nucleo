@@ -1,0 +1,34 @@
+{
+  "name": "memory-nucleo",
+  "version": "1.0.0",
+  "description": "Progressive memory system for OpenClaw agents",
+  "author": "Marcelo <marcelo@mdx.agency>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/marcelo/memory-nucleo.git"
+  },
+  "keywords": [
+    "openclaw",
+    "memory",
+    "progressive-memory",
+    "rag",
+    "session",
+    "agent"
+  ],
+  "openclaw": {
+    "skill": {
+      "name": "memory-nucleo",
+      "namespace": "memory-nucleo",
+      "version": "1.0.0",
+      "entry": "cli.sh"
+    }
+  },
+  "scripts": {
+    "test": "echo \"No tests specified\" && exit 0",
+    "health": "./cli.sh health",
+    "add": "./cli.sh add",
+    "search": "./cli.sh search",
+    "recall": "./cli.sh recall"
+  }
+}
