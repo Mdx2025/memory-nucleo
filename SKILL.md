@@ -1,3 +1,9 @@
+---
+name: memory-nucleo
+description: Progressive memory system for OpenClaw. Manages inter-session memory, recall, and RAG integration.
+metadata: {"clawdbot":{"emoji":"🧠"}}
+---
+
 # memory-nucleo
 
 **Namespace:** `memory-nucleo`
@@ -15,7 +21,7 @@ Progressive memory system for OpenClaw. Manages inter-session memory, recall, an
 | **Recall** | `memory-nucleo recall` | Progressive recall (~100 tokens) |
 | **Consolidate** | `memory-nucleo consolidate` | Weekly consolidation & archive |
 | **Health** | `memory-nucleo health` | System health check |
-| **RAG Search** | `memory-nucleo rag-search` | Search critical knowledge base |
+| **RAG Search** | `memory-nucleo rag-search` | Search RAG knowledge base |
 
 ## 🚀 Quick Start
 

@@ -1,132 +1,85 @@
-# memory-nucleo
+# 🧠 Memory-Nucleo
 
-Progressive memory system for OpenClaw agents.
+Progressive memory system for OpenClaw. Manages inter-session memory, recall, and RAG integration.
 
-## Installation
+## 📦 Estado: PRODUCTION READY
 
-```bash
-# Clone or download to skills directory
-cd ~/.openclaw/workspace/skills/memory-nucleo
-chmod +x cli.sh scripts/*.sh
-```
+**Última actualización:** 2026-02-09  
+**Fases:** ✅ Fases 1-4 completadas  
+**Tokens/sesión:** ~400 max
 
-## Usage
+## 📖 Documentación Completa
 
-### Add Memory Entry
+Ver: `memory-tracked/updates/2026-02-09_memory-nucleo_COMPLETE.md`
 
-```bash
-# Add a rule
-./cli.sh add "rule" "No auto-load MEMORY.md" 80 "Optimization rule" --status active --priority high
-
-# Add a decision
-./cli.sh add "decision" "Use Ollama local" 100 "Cost optimization" --status completed --priority high
-
-# Add a project
-./cli.sh add "project" "EMAILBOT v3" 200 "Production deployment" --status active --priority medium
-```
-
-### Search Memory
+## 🚀 Quick Start
 
 ```bash
-# Search all
-./cli.sh search "optimization"
+# Recall para heartbeat (~100 tokens)
+./scripts/memory-recall.sh "lead,emailbot"
 
-# Search with filters
-./cli.sh search "email" --status active
+# Buscar en memoria
+./scripts/memory-search.sh "SSH"
+
+# Ver cambios en scripts
+./scripts/memory-auto-track.sh --status
+
+# Buscar en histórico (últimos 7 días)
+./scripts/memory-cross-session.sh search "RAG" --days 7
+
+# Ver timeline
+./scripts/memory-cross-session.sh timeline
+
+# Exportar contexto para modelo
+./scripts/memory-cross-session.sh export 7
+
+# Auto-learn: checkear si ya respondí
+./scripts/memory-autolearn-v2.sh check "SSH access"
 ```
 
-### Progressive Recall
+## 📊 Scripts del Sistema
 
-```bash
-# For heartbeats (~100 tokens)
-./cli.sh recall "lead,emailbot,notion"
+| Script | Descripción |
+|--------|-------------|
+| `memory-progressive.sh` | Progressive recall |
+| `memory-recall.sh` | Recall rápido para heartbeat |
+| `memory-search.sh` | Búsqueda en memoria |
+| `memory-consolidate.sh` | Consolidación semanal |
+| `memory-auto-track.sh` | Detecta cambios en scripts críticos |
+| `session-handoff.sh` | Preserva contexto entre sesiones |
+| `memory-index-generate.sh` | Genera índices JSON |
+| `memory-autolearn-v2.sh` | Detecta "ya te lo dije" |
+| `memory-cross-session.sh` | Búsqueda histórica por días |
+| `rag-core.sh` | Motor RAG principal |
+| `rag-search.sh` | Búsqueda rápida KB |
 
-# Full recall
-./cli.sh recall "all"
-```
-
-### Update Status
-
-```bash
-# Mark complete
-./cli.sh update-status 5 completed
-
-# Pause entry
-./cli.sh update-status 3 paused
-```
-
-### Reference Entry
-
-```bash
-# Update timestamp (prevents expiration)
-./cli.sh reference 5
-```
-
-### Consolidate
-
-```bash
-# Weekly archive
-./cli.sh consolidate --dry-run  # Preview
-./cli.sh consolidate            # Execute
-```
-
-### Health Check
-
-```bash
-./cli.sh health
-```
-
-## RAG Integration
-
-```bash
-# Search critical knowledge
-./cli.sh rag-search "ssh"
-
-# Auto-learn pattern
-./cli.sh auto-learn "pattern" "learning" "context"
-```
-
-## Examples
-
-### Session Summary
-
-```bash
-# Add decision
-./cli.sh add "decision" "Cron jobs permanent" 120 "All cron jobs are permanent" --status completed --priority high
-
-# Add next step
-./cli.sh add "task" "Implement email automation" 150 "Use EMAILBOT v3" --status active --priority medium
-```
-
-### Quick Reference
-
-```bash
-# Find all active rules
-./cli.sh search "rule" --status active
-
-# Find recent decisions
-./cli.sh search "decision" --status completed
-```
-
-## File Structure
+## 📁 Estructura
 
 ```
 memory-nucleo/
-├── README.md
-├── SKILL.md
-├── cli.sh              # Main entry point
-├── scripts/
-│   ├── memory-progressive.sh
-│   ├── memory-recall.sh
-│   ├── memory-search.sh
-│   ├── memory-consolidate.sh
-│   ├── session-summary.sh
-│   └── rag-search.sh
-└── .rag-index/
-    ├── critical-knowledge.md
-    └── auto-learn.md
+├── scripts/           # 10+ scripts
+├── .memory-index/     # 43+ índices JSON
+├── .session-handoff/  # Contexto sesiones
+├── memory-tracked/    # Updates + snapshots + autolearn
+└── skills/memory-nucleo/
 ```
 
-## License
+## 🔄 Flujo de Memoria
 
-MIT
+```
+Nueva Sesión → session-handoff --load → memory-recall → memory-index → Ready
+```
+
+## 🎯 Stats Commands
+
+```bash
+./scripts/memory-cross-session.sh stats
+./scripts/memory-autolearn-v2.sh stats
+./scripts/memory-index-generate.sh --status
+./scripts/memory-auto-track.sh --status
+```
+
+---
+
+**Costo:** $0/mes (100% local con llama3.2:3b)  
+**Docs:** `memory-tracked/updates/2026-02-09_memory-nucleo_COMPLETE.md`

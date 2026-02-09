@@ -14,6 +14,7 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 NC='\033[0m'
 
 print_usage() {
@@ -23,19 +24,21 @@ print_usage() {
     echo ""
     echo "Commands:"
     echo "  add <type> <summary> <tokens> <context>  Add memory entry"
-    echo "  search <query>                         Search memory"
+    echo "  search <query>                         Search memory (hybrid + RAG)"
     echo "  recall <tags>                          Progressive recall (~100 tokens)"
     echo "  update-status <id> <status>            Update entry status"
     echo "  reference <id>                         Update last_referenced"
     echo "  consolidate                            Weekly consolidation"
     echo "  health                                 System health check"
-    echo "  rag-search <query>                     Search RAG knowledge base"
+    echo "  rag-search <query>                     Search RAG knowledge base (hybrid)"
     echo "  auto-learn <pattern> <learning>        Auto-learn pattern"
     echo ""
     echo "Options:"
     echo "  --status active|paused|completed       Entry status"
     echo "  --priority high|medium|low             Entry priority"
     echo "  --dry-run                              Preview (for consolidate)"
+    echo "  --hybrid                               Force hybrid search (default)"
+    echo "  --keyword-only                         Use only keyword search"
     echo "  --help                                 Show this help"
     echo ""
     echo "Types: rule, decision, gotcha, project, task, note"
@@ -81,12 +84,12 @@ cmd_add() {
         exit 1
     fi
     
-    run_script "memory-progressive.sh" "add" "$type" "$summary" "$tokens" "$context" "$status" "$priority"
+    run_script "memory-progressive" "add" "$type" "$summary" "$tokens" "$context" "$status" "$priority"
 }
 
 cmd_search() {
     local query="$1"
-    shift
+    local mode="hybrid"
     local status_filter=""
     
     while [[ $# -gt 0 ]]; do
@@ -94,6 +97,14 @@ cmd_search() {
             --status)
                 status_filter="$2"
                 shift 2
+                ;;
+            --hybrid)
+                mode="hybrid"
+                shift
+                ;;
+            --keyword-only)
+                mode="keyword"
+                shift
                 ;;
             *)
                 shift
@@ -106,11 +117,21 @@ cmd_search() {
         exit 1
     fi
     
+    echo -e "${CYAN}🔍 Searching: '$query' (mode: $mode)${NC}"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    
+    # Memory entries search
     if [[ -n "$status_filter" ]]; then
-        run_script "memory-search.sh" "$query" "$status_filter"
+        echo -e "\n${YELLOW}📚 Memory Entries:${NC}"
+        run_script "memory-search" "$query" "$status_filter"
     else
-        run_script "memory-search.sh" "$query"
+        echo -e "\n${YELLOW}📚 Memory Entries:${NC}"
+        run_script "memory-search" "$query"
     fi
+    
+    # RAG hybrid search
+    echo -e "\n${YELLOW}📖 RAG Knowledge Base (Hybrid):${NC}"
+    run_script "semantic-search" "$query"
 }
 
 cmd_recall() {
@@ -121,7 +142,7 @@ cmd_recall() {
         tags="all"
     fi
     
-    run_script "memory-recall.sh" "$tags"
+    run_script "memory-recall" "$tags"
 }
 
 cmd_update_status() {
@@ -133,7 +154,7 @@ cmd_update_status() {
         exit 1
     fi
     
-    run_script "memory-progressive.sh" "update-status" "$id" "$status"
+    run_script "memory-progressive" "update-status" "$id" "$status"
 }
 
 cmd_reference() {
@@ -144,7 +165,7 @@ cmd_reference() {
         exit 1
     fi
     
-    run_script "memory-progressive.sh" "reference" "$id"
+    run_script "memory-progressive" "reference" "$id"
 }
 
 cmd_consolidate() {
@@ -163,9 +184,9 @@ cmd_consolidate() {
     done
     
     if [[ "$dry_run" == "true" ]]; then
-        run_script "memory-consolidate.sh" "--dry-run"
+        run_script "memory-consolidate" "--dry-run"
     else
-        run_script "memory-consolidate.sh"
+        run_script "memory-consolidate"
     fi
 }
 
@@ -175,11 +196,11 @@ cmd_health() {
     
     # Check scripts
     echo -e "\n${YELLOW}Scripts:${NC}"
-    for script in memory-progressive.sh memory-recall.sh memory-search.sh memory-consolidate.sh session-summary.sh rag-search.sh; do
-        if [[ -x "${SKILL_DIR}/scripts/${script}" ]]; then
-            echo -e "  ✅ $script"
+    for script in memory-progressive memory-recall memory-search memory-consolidate session-summary rag-search semantic-search; do
+        if [[ -x "${SKILL_DIR}/scripts/${script}.sh" ]]; then
+            echo -e "  ✅ ${script}.sh"
         else
-            echo -e "  ❌ $script (not executable)"
+            echo -e "  ❌ ${script}.sh (not executable)"
         fi
     done
     
@@ -201,6 +222,18 @@ cmd_health() {
         echo -e "  ⚠️  critical-knowledge.md (not found)"
     fi
     
+    # Check Ollama
+    echo -e "\n${YELLOW}Ollama (Embeddings):${NC}"
+    if curl -s http://localhost:11434/api/tags >/dev/null 2>&1; then
+        if ollama list | grep -q "nomic-embed-text"; then
+            echo -e "  ✅ nomic-embed-text installed"
+        else
+            echo -e "  ⚠️  nomic-embed-text not found"
+        fi
+    else
+        echo -e "  ⚠️  Ollama not running"
+    fi
+    
     echo -e "\n${GREEN}Health check complete${NC}"
 }
 
@@ -212,7 +245,7 @@ cmd_rag_search() {
         exit 1
     fi
     
-    run_script "rag-search.sh" "$query"
+    run_script "semantic-search" "$query"
 }
 
 cmd_auto_learn() {

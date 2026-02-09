@@ -1,15 +1,19 @@
 #!/bin/bash
-# Progressive Memory Manager - Auto-learning system with tags
 
-MEMORY_DIR="/home/clawd/.openclaw/workspace/memory"
+# ═══════════════════════════════════════════════════════════════
+# MEMORY-NUCLEO: Progressive Memory System v2.0
+# ═══════════════════════════════════════════════════════════════
+
+MEMORY_DIR="${MEMORY_DIR:-/home/clawd/.openclaw/workspace/memory}"
 TODAY=$(date +%Y-%m-%d)
+NOW=$(date -Iseconds)
 FILE="$MEMORY_DIR/$TODAY.md"
 
 # Initialize today's memory file if not exists
 init_daily() {
     if [ ! -f "$FILE" ]; then
-        cat > "$FILE" << 'TEMPLATE'
-# $(date +%Y-%m-%d) (Jarvis)
+        cat > "$FILE" << TEMPLATE
+# $TODAY (Jarvis)
 
 ## 📋 Index (~80 tokens)
 | # | Type | Status | Priority | Summary | ~Tok |
@@ -22,37 +26,58 @@ TEMPLATE
     fi
 }
 
-# Add memory entry with progressive format and tags
+# Add new entry
 add() {
     local type="$1"
     local summary="$2"
-    local tokens="${3:-100}"
+    local tokens="$3"
     local context="$4"
     local status="${5:-active}"
     local priority="${6:-medium}"
     
     init_daily
     
-    # Find next entry number
-    local last_num=$(grep -E '^\| [0-9]+ \|' "$FILE" 2>/dev/null | tail -1 | sed 's/| \([0-9]*\) |.*/\1/' || echo "0")
-    local next_num=$((last_num + 1))
+    # Find next number
+    local next_num=1
+    if grep -q "| [0-9]+ |" "$FILE" 2>/dev/null; then
+        next_num=$(grep "| [0-9]+ |" "$FILE" | tail -1 | sed 's/| \([0-9]*\) |.*/\1/' | awk '{print $1 + 1}')
+    fi
+    [ -z "$next_num" ] && next_num=1
     
-    # Get icon based on type
-    local icon=$(get_icon "$type")
+    # Prevent duplicates - check if summary exists
+    if grep -qF "$summary" "$FILE" 2>/dev/null; then
+        echo "⚠️ Entry already exists: $summary"
+        return 1
+    fi
     
-    # Add to index with tags
-    sed -i "/^|---|------|--------|----------|-----|$/a| $next_num | $icon | $status | $priority | $summary | $tokens |" "$FILE"
+    # Build icon
+    local icon="🔵"
+    case "$type" in
+        rule) icon="🚨" ;;
+        gotcha) icon="🔴" ;;
+        fix) icon="🟡" ;;
+        decision) icon="🟤" ;;
+        project) icon="🔵" ;;
+        change) icon="🟣" ;;
+        discovery) icon="🟢" ;;
+    esac
     
-    # Add full entry with metadata
+    # Add to index
+    sed -i "/^## 📋 Index.*/a| $next_num | $icon | $status | $priority | ${summary:0:50}... | ~$tokens |" "$FILE"
+    
+    # Add full entry
     cat >> "$FILE" << ENTRY
 
-### #$next_num | $icon $summary | ~$tokens tokens
+### #$next_num | $icon $type | ~$tokens tokens
 **Type:** $type
 **Status:** $status
 **Priority:** $priority
-**Context:** $context
-**Last Referenced:** $(date -Iseconds)
-**Created:** $(date -Iseconds)
+**Context:** ~$tokens
+**Last Referenced:** $NOW
+**Created:** $NOW
+
+$context
+
 ENTRY
     
     echo "✅ Entry #$next_num added: $summary [$status, $priority]"
@@ -63,14 +88,36 @@ get_icon() {
         rule) echo "🚨" ;;
         gotcha) echo "🔴" ;;
         fix) echo "🟡" ;;
-        how) echo "🔵" ;;
-        change) echo "🟢" ;;
-        discovery) echo "🟣" ;;
-        why) echo "🟠" ;;
         decision) echo "🟤" ;;
-        tradeoff) echo "⚖️" ;;
+        project) echo "🔵" ;;
+        change) echo "🟣" ;;
+        discovery) echo "🟢" ;;
         *) echo "🔵" ;;
     esac
+}
+
+# List entries
+list() {
+    init_daily
+    echo "=== 📋 All entries for $TODAY ==="
+    grep -E '^### #|^\| [0-9]+ |' "$FILE" | head -30
+}
+
+# List active only
+list_active() {
+    init_daily
+    echo "=== 📋 Active entries for $TODAY ==="
+    grep -E '^### #|^\| [0-9]+ | active |' "$FILE" | head -30
+}
+
+# Stats
+stats() {
+    init_daily
+    echo "=== 📊 Memory Stats ==="
+    echo "Total entries: $(grep -c '^### #' "$FILE" 2>/dev/null || echo 0)"
+    echo "Active: $(grep -c '| active |' "$FILE" 2>/dev/null || echo 0)"
+    echo "Paused: $(grep -c '| paused |' "$FILE" 2>/dev/null || echo 0)"
+    echo "Completed: $(grep -c '| completed |' "$FILE" 2>/dev/null || echo 0)"
 }
 
 # Update entry status
@@ -83,12 +130,12 @@ update_status() {
         return 1
     fi
     
-    # Update index
-    sed -i "s/| $num | \(.\) | \(.\) | \(.\) |/\1 | $new_status | \2 |/" "$FILE"
+    # Update index - fix sed pattern for the specific format
+    sed -i "s/| $num | \(.\) | \(.\) | \(.\) |/| $num | \1 | $new_status | \3 |/" "$FILE"
     
     # Update full entry
     sed -i "s/\*\*Status:\*\* \(.*\)/\*\*Status:\*\* $new_status/" "$FILE"
-    sed -i "s/\*\*Last Referenced:\*\*/\*\*Last Referenced:\*\* $(date -Iseconds)/" "$FILE"
+    sed -i "s/\*\*Last Referenced:\*\*/\*\*Last Referenced:\*\* $NOW/" "$FILE"
     
     echo "✅ Entry #$num status → $new_status"
 }
@@ -104,7 +151,7 @@ update_priority() {
     fi
     
     # Update index
-    sed -i "s/| $num | \(.\) | \(.\) | \(.\) |/\1 | \2 | $new_priority | \3 |/" "$FILE"
+    sed -i "s/| $num | \(.\) | \(.\) | \(.\) |/| $num | \1 | \2 | $new_priority |/" "$FILE"
     
     # Update full entry
     sed -i "s/\*\*Priority:\*\* \(.*\)/\*\*Priority:\*\* $new_priority/" "$FILE"
@@ -121,7 +168,7 @@ reference() {
         return 1
     fi
     
-    sed -i "s/\*\*Last Referenced:\*\* \(.*\)/\*\*Last Referenced:\*\* $(date -Iseconds)/" "$FILE"
+    sed -i "s/\*\*Last Referenced:\*\* \(.*\)/\*\*Last Referenced:\*\* $NOW/" "$FILE"
     sed -i "s/| $num | \(.\) | \(.\) | \(.\) |/\1 | \2 | \3 |/" "$FILE"
     
     echo "✅ Entry #$num referenced"
@@ -134,148 +181,109 @@ scan_index() {
     grep -E '^#|^\| [0-9]+ | active |' "$FILE" | head -20
 }
 
-# Scan all entries regardless of status
+# Scan all
 scan_all() {
     init_daily
-    echo "=== 📋 Index for $TODAY (all) ==="
-    grep -E '^#|^\| [0-9]+ |' "$FILE" | head -20
+    echo "=== 📋 Full Index for $TODAY ==="
+    grep -E '^#|^\| [0-9]+ |' "$FILE" | head -40
 }
 
-# Show entry by number
+# Show entry details
 show() {
     local num="$1"
-    local content=$(sed -n "/^### #$num |/,/^### [0-9]/p" "$FILE" | head -20)
-    echo "$content"
+    if [ -z "$num" ]; then
+        echo "Usage: $0 show <num>"
+        return 1
+    fi
+    
+    if [ ! -f "$FILE" ]; then
+        echo "❌ No memory file for today"
+        return 1
+    fi
+    
+    echo "=== Entry #$num ==="
+    sed -n "/^### #$num /,/^### /p" "$FILE" | head -20
 }
 
-# List all entries
-list() {
-    grep -E '^\| [0-9]+ |' "$FILE"
-}
-
-# List only active entries
-list_active() {
-    grep -E '^\| [0-9]+ |.*| active |' "$FILE"
-}
-
-# Stats
-stats() {
-    echo "=== 📊 Memory Stats ==="
-    echo "Today's entries: $(grep -c '^\| [0-9]+ |' "$FILE" 2>/dev/null || echo 0)"
-    echo "Active: $(grep -c '| active |' "$FILE" 2>/dev/null || echo 0)"
-    echo "Paused: $(grep -c '| paused |' "$FILE" 2>/dev/null || echo 0)"
-    echo "Completed: $(grep -c '| completed |' "$FILE" 2>/dev/null || echo 0)"
-    echo "Total tokens indexed: $(grep -E '^\| [0-9]+ |' "$FILE" 2>/dev/null | awk -F'|' '{sum+=$6} END {print sum+0}')"
-}
-
-# Auto-learn: Detect patterns from conversation
+# Auto-learn pattern
 auto_learn() {
     local pattern="$1"
     local learning="$2"
     local context="$3"
     
-    # Check if this pattern already exists
-    if grep -q "$pattern" "$FILE" 2>/dev/null; then
-        echo "⏭️ Pattern already known: $pattern"
+    add "discovery" "$pattern" 50 "$context" "active" "high"
+}
+
+# Search entries
+search() {
+    local query="$1"
+    local status_filter="${2:-}"
+    
+    if [ -z "$query" ]; then
+        echo "Usage: $0 search <query> [status]"
         return 1
     fi
     
-    # Add as discovery with high priority
-    add "discovery" "$learning" "150" "$context" "active" "high"
-    echo "🧠 Learned: $learning"
-}
-
-# Search with status filter
-search() {
-    local query="$1"
-    local status_filter="${2:-all}"
-    
-    echo "=== 🔍 Search: '$query' ==="
-    
-    if [ "$status_filter" = "all" ]; then
-        grep -r -n "$query" "$MEMORY_DIR" --include="????-??-??.md" 2>/dev/null | head -10
+    echo "=== 🔍 Search: $query ==="
+    if [ -n "$status_filter" ]; then
+        grep -B2 -A2 "$query" "$MEMORY_DIR"/*.md 2>/dev/null | grep -E "$status_filter|^\|.*$query" || echo "No matches found"
     else
-        grep -r -n "$query" "$MEMORY_DIR" --include="????-??-??.md" 2>/dev/null | while read line; do
-            if grep -q "| $status_filter |" "$(echo "$line" | cut -d: -f1)"; then
-                echo "$line"
-            fi
-        done | head -10
+        grep -B2 -A2 "$query" "$MEMORY_DIR"/*.md 2>/dev/null || echo "No matches found"
     fi
 }
 
+# Quick context for LLM prompts
+context() {
+    init_daily
+    echo "=== 🧠 Quick Context ==="
+    grep "| active |" "$FILE" | head -5 | sed 's/| [0-9]* | \(.\) | active | \(.\) | \(.\) | \(.*\) |.*/\1 \2 \3: \4/'
+}
+
+# Show today's file
+today() {
+    if [ -f "$FILE" ]; then
+        cat "$FILE"
+    else
+        echo "No memory file for today"
+    fi
+}
+
+# Main dispatcher
 case "$1" in
     init) init_daily ;;
     add) add "$2" "$3" "$4" "$5" "$6" "$7" ;;
+    list) list ;;
+    list-active) list_active ;;
+    stats) stats ;;
     update-status) update_status "$2" "$3" ;;
     update-priority) update_priority "$2" "$3" ;;
     reference) reference "$2" ;;
     scan) scan_index ;;
     scan-all) scan_all ;;
     show) show "$2" ;;
-    list) list ;;
-    list-active) list_active ;;
-    stats) stats ;;
     auto_learn) auto_learn "$2" "$3" "$4" ;;
     search) search "$2" "$3" ;;
-    *) echo "Usage: $0 {init|add|type|summary|tokens|context|status|priority|update-status|num|status|update-priority|num|priority|reference|num|scan|scan-all|show|num|list|list-active|stats|auto_learn|pattern|learning|context|search|query|status}" ;;
+    context) context ;;
+    today) today ;;
+    *) 
+        echo "Memory-Nucleo v2.0 - Progressive Memory System"
+        echo "Usage: $0 <command> [args]"
+        echo ""
+        echo "Commands:"
+        echo "  init              Initialize today's memory file"
+        echo "  add <type> <summary> <tokens> <context> [status] [priority]"
+        echo "  list              List all entries"
+        echo "  list-active       List only active entries"
+        echo "  stats             Show statistics"
+        echo "  update-status # <status>    Change entry status"
+        echo "  update-priority # <priority> Change entry priority"
+        echo "  reference #       Update timestamp"
+        echo "  scan              Fast scan active index"
+        echo "  scan-all          Full scan"
+        echo "  show #            Show entry details"
+        echo "  auto_learn <pattern> <learning> <context>"
+        echo "  search <query> [status]  Search entries"
+        echo "  context           Quick context for LLM"
+        echo "  today             Show today's file"
+        ;;
 esac
-
-# ========================================
-# RAG INTEGRATION - Auto-búsqueda en KB
-# ========================================
-
-rag_search() {
-    local query="$1"
-    local result
-    
-    # Si el script existe, usarlo
-    if [ -f "$SCRIPT_DIR/rag-search.sh" ]; then
-        result=$("$SCRIPT_DIR/rag-search.sh" "$query" 2>/dev/null)
-        if [ $? -eq 0 ] && [ -n "$result" ]; then
-            echo "$result"
-            return 0
-        fi
-    fi
-    
-    # Fallback: grep directo
-    local kb_file="/home/clawd/.openclaw/workspace/.rag-index/critical-knowledge.md"
-    if [ -f "$kb_file" ]; then
-        grep -A 3 -i "$query" "$kb_file" 2>/dev/null | head -15
-    fi
-    return 1
-}
-
-rag_auto_check() {
-    local message="$1"
-    
-    # Patrones que NO deben preguntar (ya están en KB)
-    local forbidden_patterns=(
-        "dónde.*hosting" "dónde.*dominio" "dónde.*el.*servidor"
-        "qué.*contraseña" "qué.*password" "qué.*clave"
-        "cómo.*accedo" "cómo.*conectar" "cómo.*ssh"
-        "cuál.*ip" "cuál.*servidor" "dónde.*está.*el"
-        "app.*password" "token.*dónde" "clave.*dónde"
-        "acceso.*sudo" "permisos.*sudo" "tiene.*sudo"
-        "ver.*logs" "ver.*contenedores" "reiniciar.*nginx"
-    )
-    
-    for pattern in "${forbidden_patterns[@]}"; do
-        if echo "$message" | grep -iqE "$pattern"; then
-            # Buscar en KB
-            local kb_result
-            kb_result=$(rag_search "$pattern")
-            if [ -n "$kb_result" ]; then
-                echo "RAG_HIT|$kb_result"
-                return 0
-            fi
-        fi
-    done
-    
-    echo "RAG_MISS"
-    return 1
-}
-
-# Alias rápido para usar en el flujo
-rag() {
-    rag_search "$1"
-}
